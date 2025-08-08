@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
+    <title>Cow Run Game</title>
     
     <!-- CSS for page styling -->
     <style>
@@ -41,7 +41,7 @@
 </head>
 <body>
 
-   
+    <h1>Cow Run Game</h1>
     <canvas id="gameCanvas" width="800" height="250"></canvas>
     <p>Press Space or Click to Jump!</p>
     
@@ -59,7 +59,7 @@
         let frameCount = 0;
         let gameOver = false;
         let gameSpeed = 4;
-        let spawnTimer = 120;
+        let spawnTimer = 150; // EASY MODE: Increased initial spawn timer
 
         // --- Player (Cow) Properties ---
         const player = {
@@ -171,7 +171,6 @@
             const chewOffset = Math.sin(Date.now() / 200) * 2;
             ctx.fillStyle = '#FFC0CB'; // Pink
             ctx.beginPath();
-            // FIX: Added startAngle (0) and endAngle (Math.PI * 2) arguments
             ctx.ellipse(headX + 10 + chewOffset, headY + 10, 20, 15, 0.2, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
@@ -270,7 +269,8 @@
             // Obstacle logic
             frameCount++;
             if (frameCount > spawnTimer) {
-                const obstacleHeight = Math.random() * 50 + 25;
+                // EASY MODE: Obstacles are shorter
+                const obstacleHeight = Math.random() * 35 + 20; 
                 obstacles.push({
                     x: canvas.width,
                     y: canvas.height - obstacleHeight,
@@ -278,7 +278,8 @@
                     height: obstacleHeight
                 });
                 frameCount = 0;
-                spawnTimer = Math.max(60, 120 - score * 2); 
+                // EASY MODE: Slower difficulty progression
+                spawnTimer = Math.max(70, 150 - score); 
             }
 
             // Move & check for obstacle collision
@@ -289,7 +290,8 @@
                 if (o.x + o.width < 0) {
                     obstacles.splice(i, 1);
                     score++;
-                    if (score % 5 === 0) gameSpeed += 0.2;
+                    // EASY MODE: Slower speed increase
+                    if (score % 8 === 0) gameSpeed += 0.1; 
                 }
 
                 // Collision detection
