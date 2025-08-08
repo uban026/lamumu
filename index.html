@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    
+    <!-- CSS for page styling -->
+    <style>
+        body {
+            background-color: #A2CFA5; /* Background color from the cow CSS */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            color: #333;
+            text-align: center;
+        }
+        h1 {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        canvas {
+            background-color: #70B875; /* Darker grass color */
+            border: 3px solid #3a2e27;
+            border-radius: 10px;
+            display: block;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        p {
+            margin-top: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px #000000;
+        }
+    </style>
+</head>
+<body>
+
+   
+    <canvas id="gameCanvas" width="800" height="250"></canvas>
+    <p>Press Space or Click to Jump!</p>
+    
+    <!-- JavaScript for game logic -->
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Game Variables ---
+        const gravity = 0.6;
+        const jumpStrength = -13;
+        const legHeight = 30;
+        let obstacles = [];
+        let score = 0;
+        let frameCount = 0;
+        let gameOver = false;
+        let gameSpeed = 4;
+        let spawnTimer = 120;
+
+        // --- Player (Cow) Properties ---
+        const player = {
+            x: 100,
+            y: 180,
+            width: 70,
+            height: 50,
+            velocityY: 0,
+            isJumping: false,
+            // Store spot positions so they don't change
+            spots: [
+                {x: -20, y: 10, r: 8}, {x: 0, y: 25, r: 12}, {x: 20, y: 15, r: 10}
+            ]
+        };
+
+        // --- DRAWING FUNCTIONS ---
+
+        function drawPlayer() {
+            const p = player;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+
+            // Running leg animation
+            const legAngle = p.isJumping ? 0.3 : Math.sin(Date.now() / 80) * 0.5;
+
+            // Back Legs (Left & Right)
+            drawLeg(-p.width/2 + 15, p.height - 5, -legAngle, '#dddddd'); // Slightly darker
+            drawLeg(p.width/2 - 25, p.height - 5, legAngle, '#dddddd');
+
+            // Cow Body
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.roundRect(-p.width/2, 0, p.width, p.height, 20);
+            ctx.fill();
+            ctx.stroke();
+
+            // Spots on body
+            ctx.fillStyle = 'black';
+            p.spots.forEach(spot => {
+                ctx.beginPath();
+                ctx.arc(spot.x, spot.y, spot.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Front Legs (Left & Right)
+            drawLeg(-p.width/2 + 35, p.height - 5, legAngle, 'white');
+            drawLeg(p.width/2 - 5, p.height - 5, -legAngle, 'white');
+
+            // Tail
+            ctx.save();
+            ctx.translate(-p.width/2 - 5, p.height/2);
+            ctx.rotate(0.5);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(10, 20, 0, 30);
+            ctx.stroke();
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(0, 30, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Head
+            drawHead();
+            
+            ctx.restore();
+        }
+        
+        function drawLeg(x, y, angle, color) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(-5, 0, 10, legHeight, 5);
+            ctx.fill();
+            ctx.stroke();
+            // Hoof
+            ctx.fillStyle = 'black';
+            ctx.fillRect(-6, legHeight, 12, 5);
+            ctx.restore();
+        }
+
+        function drawHead() {
+            const headX = player.width / 2 - 10;
+            const headY = player.height / 2 - 10;
+
+            // Right Ear (Animation)
+            let earAngle = 1.2;
+            // Flick every ~5 seconds
+            if (Math.floor(Date.now() / 1000) % 5 === 0 && Date.now() % 1000 < 200) {
+                earAngle = 0.8;
+            }
+            drawEar(headX + 20, headY - 15, earAngle);
+
+            // Head
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.roundRect(headX - 15, headY - 20, 45, 40, 15);
+            ctx.fill();
+            ctx.stroke();
+
+            // Left Ear
+            drawEar(headX - 5, headY - 15, -1.2);
+
+            // Snout (Chewing Animation)
+            const chewOffset = Math.sin(Date.now() / 200) * 2;
+            ctx.fillStyle = '#FFC0CB'; // Pink
+            ctx.beginPath();
+            // FIX: Added startAngle (0) and endAngle (Math.PI * 2) arguments
+            ctx.ellipse(headX + 10 + chewOffset, headY + 10, 20, 15, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            // Nostrils
+            ctx.fillStyle = 'black';
+            ctx.beginPath(); ctx.arc(headX + 5 + chewOffset, headY + 8, 2, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(headX + 18 + chewOffset, headY + 12, 2, 0, Math.PI*2); ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(headX, headY - 5, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(headX + 20, headY - 5, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawEar(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.roundRect(-10, -5, 20, 15, 8);
+            ctx.fill();
+            ctx.stroke();
+            // Inner ear
+            ctx.fillStyle = '#FFC0CB';
+            ctx.beginPath();
+            ctx.roundRect(-7, -2, 14, 10, 6);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                ctx.fillStyle = '#8B4513';
+                ctx.strokeStyle = '#5A2D0C';
+                ctx.lineWidth = 2;
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+                ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        function drawScore() {
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'left';
+            ctx.strokeText(`Score: ${score}`, 15, 30);
+            ctx.fillText(`Score: ${score}`, 15, 30);
+        }
+        
+        function showGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.font = 'bold 50px Arial';
+            ctx.textAlign = 'center';
+
+            ctx.strokeText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+            
+            ctx.font = '20px Arial';
+            ctx.strokeText('Refresh to play again', canvas.width / 2, canvas.height / 2 + 20);
+            ctx.fillText('Refresh to play again', canvas.width / 2, canvas.height / 2 + 20);
+        }
+
+        // --- GAME LOGIC ---
+
+        function update() {
+            if (gameOver) {
+                showGameOver();
+                return;
+            }
+
+            requestAnimationFrame(update);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update player position
+            player.velocityY += gravity;
+            player.y += player.velocityY;
+
+            const groundPosition = canvas.height - player.height - legHeight;
+            if (player.y > groundPosition) {
+                player.y = groundPosition;
+                player.velocityY = 0;
+                player.isJumping = false;
+            }
+
+            // Obstacle logic
+            frameCount++;
+            if (frameCount > spawnTimer) {
+                const obstacleHeight = Math.random() * 50 + 25;
+                obstacles.push({
+                    x: canvas.width,
+                    y: canvas.height - obstacleHeight,
+                    width: 30,
+                    height: obstacleHeight
+                });
+                frameCount = 0;
+                spawnTimer = Math.max(60, 120 - score * 2); 
+            }
+
+            // Move & check for obstacle collision
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let o = obstacles[i];
+                o.x -= gameSpeed;
+
+                if (o.x + o.width < 0) {
+                    obstacles.splice(i, 1);
+                    score++;
+                    if (score % 5 === 0) gameSpeed += 0.2;
+                }
+
+                // Collision detection
+                const playerRight = player.x + player.width / 2;
+                const playerLeft = player.x - player.width / 2;
+                const playerBottom = player.y + player.height + legHeight;
+                if (playerRight > o.x && playerLeft < o.x + o.width && playerBottom > o.y) {
+                    gameOver = true;
+                }
+            }
+
+            drawPlayer();
+            drawObstacles();
+            drawScore();
+        }
+
+        function jump() {
+            if (!player.isJumping && !gameOver) {
+                player.velocityY = jumpStrength;
+                player.isJumping = true;
+            }
+        }
+
+        // Event listeners
+        window.addEventListener('keydown', (e) => { if (e.code === 'Space') jump(); });
+        canvas.addEventListener('mousedown', jump);
+        canvas.addEventListener('touchstart', jump); // Added touch support
+
+        // Start game
+        update();
+    </script>
+
+</body>
+</html>
